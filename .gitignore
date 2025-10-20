@@ -192,3 +192,4 @@ cypress/videos
 /vendor-bin
 composer.lock
 dist/*.license
+3rdparty
