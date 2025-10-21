@@ -6,114 +6,70 @@ use OCP\UserInterface;
 use OCP\Util;
 use Psr\Log\LoggerInterface;
 use OCP\IDBConnection;
+use OCP\IUserManager;
+use OCP\IGroupManager;
+use OCP\Files\IRootFolder;
+use OC\User\Database as DatabaseBackend;
+use OCP\IUser;
 
-class iProtekBackend implements IUserBackend, UserInterface {
+class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
     private IDBConnection $db;
     public LoggerInterface $logger;
     public static string $UserId = '';
     private string $user_table;
     
     public function __construct(IDBConnection $db, LoggerInterface $logger) {
+        parent::__construct();
         $this->db = $db;
         $this->logger = $logger;
         $this->user_table = \OC::$server->getConfig()->getSystemValue('dbtableprefix'). 'users';
     }
 
-
-    // Optional: a simple in-memory user list
-    private array $users = [
-        'drimcaster' => [
-            'password' => 'secret', // for real use: store hashed passwords
-            'displayName' => 'Test User'
-        ]
-    ];
-
     /**
      * Check if a user exists
      */
     public function userExists($uid): bool {
-
-        //IF USERID Exists then assign. 
-
-        if(!is_numeric($uid)){ 
-            static::$UserId = $uid;
-        } 
-
-        //THEN THIS SHOULD RETURN TRUE ALWAYS FOR DUE TO EXTERNAL AUTHENTICATION
-
         return true;
     }
+        
 
     /**
      * Authenticate the user
+     * return false if authentication fails
+     * return uid if authentication succeeds
      */
-    public function checkPassword($uid, $password): bool {
-
-        //die('checkPassword ' . $uid . ' ' . $password);
+    public function checkPassword($uid, $password) {
         $this->logger->error("USER: $uid PASS: $password");
-        
-        //API VALIDATION SHOULD TAKE PLACE HERE... 
-        // 1️⃣ Authenticate externally (your own logic)
-        //if ($this->authenticateExternally($uid, $password)) {
-            $this->logger->error("User {$uid} authenticated successfully : {$this->user_table}.");
+        $this->logger->error("User {$uid} authenticated successfully : {$this->user_table}."); 
 
-            // 2️⃣ Access UserManager
+        /**
+         * API CHECK SHOULD TAKE PLACE HERE
+         */
 
-            // 3️⃣ Check if Nextcloud already has the user
-            $sql = "SELECT * FROM {$this->user_table} WHERE uid = ?";
-            $query = $this->db->prepare($sql);
-            $result = $query->execute([$uid]); // ✅ execute(), not executeQuery()
 
-            $row = $query->fetch(); // ✅ then fetch()
-            if($row){
-                $this->logger->error("Nextcloud user exists: {$uid}");
-            } else {
-                $this->createNextcloudUser($uid, "api-login");
-                // Create the user in Nextcloud (no password, since backend handles it)
-                /*
-                $this->logger->error("Created Nextcloud user: {$uid}");
-                
-                $backend = new \OC\User\Database(); // ✅ core DB backend (NC33)
-                $backend->createUser($uid, "api-login");
-                */
-                //$databaseBackend->createUser($uid, null);
-                
-                //$userManager = \OC::$server->getUserManager();
-                //$user = $userManager->createUser($uid, null);
+
+
+        if($this->userExists($uid)){ 
+            $this->logger->error("Nextcloud user exists: {$uid}");
+            //UPDATE PASSWORD FOR AUTHENTICATED FOR NEXTCLOUD PURPOSES
+            $result = $this->setPassword($uid, $password);
+            if($result){
+                $this->logger->error("Password set successfully: {$uid}");
+                return $uid;
             }
-            //$this->logger->error("Checking if Nextcloud user exists: {$uid}", ["exists"=>$userManager->userExists($uid)]);
-            //$backend = new \OCA\UserDatabase\Backend();
-            //$userManager = \OC::$server->getUserManager();
-            //$userManager->registerBackend($backend);
-            //$this->logger->error("Checking if Nextcloud user exists: {$uid}", ["exists"=>$userManager->userExists($uid)]);
-
-            /*
-                if (!$userManager->userExists($uid)) {
-                    // 4️⃣ Create the user in Nextcloud (no password, since backend handles it)
-                    $user = $userManager->createUser($uid, null);
-                    $this->logger->error("Created Nextcloud user: {$uid}");
-                }
-            */
-
-            // 5️⃣ Return true so NC proceeds with login
-        return $uid;
-        //}
-
-        // 6️⃣ Invalid credentials
-        $logger->warning("Failed login for {$uid}");
-
-
-        return true;
-        if (!isset($this->users[$uid])) {
-            return false;
-        }
-
-        // For real usage, use password_verify() with hashed password
-        $isValid = $this->users[$uid]['password'] === $password;
-
-        $logger->debug("Password valid for $uid: " . ($isValid ? 'yes' : 'no'));
-        return $isValid;
+            else{
+                $this->logger->error("Failed to set password: {$uid}");
+                return false;
+            }
+        } else {
+            //CREATE USER IF NOT EXISTS
+            $this->createNextcloudUser($uid, $password);
+        } 
+        
+        return false;
+    
     }
+    
 
     /**
      * Create Nextcloud user and initialize filesystem
@@ -121,108 +77,52 @@ class iProtekBackend implements IUserBackend, UserInterface {
     private function createNextcloudUser(string $uid, string $password): bool {
         try {
             // Create the Nextcloud internal user
+            //$userManager = \OC::$server->get(IUserManager::class);
+            $groupManager = \OC::$server->get(IGroupManager::class);
+            $rootFolder = \OC::$server->get(IRootFolder::class);
+
             $backend = new \OC\User\Database(); // core DB backend
             $user = $backend->createUser($uid, $password);
             if (!$user) {
                 $this->logger->warning("User '$uid' already exists or failed to create.");
                 return false;
+            } 
+
+            // Add to 'users' group (optional)
+            $group = $groupManager->get('users');
+            if ($group) {
+                $group->addUser($user);
             }
 
-            // Initialize filesystem
-            \OC_Util::setupFS($uid);
-            $home = \OC_User::getHome($uid);
-            if (!is_dir($home)) {
-                mkdir($home, 0755, true);
+            // Initialize user’s filesystem (equivalent of old OC_User::getHome())
+            $userFolder = $rootFolder->getUserFolder($uid);
+            
+            $homePath = $userFolder->getPath();
+            if (!is_dir($homePath)) {
+                mkdir($homePath, 0755, true);
             }
 
             // Trigger post-creation hooks (like dashboard, files, etc.)
-            \OC_Hook::emit('OC_User', 'post_createUser', ['uid' => $uid]);
+            $this->logger->info("Created Nextcloud user '$uid' with home folder '$homePath'");
 
-            $this->logger->info("Created Nextcloud user '$uid' with filesystem at '$home'");
             return true;
         } catch (\Throwable $e) {
             $this->logger->error("createNextcloudUser() error: " . $e->getMessage());
             return false;
         }
-    }
+    } 
 
-    /**
-     * Required backend name
-     */
-    public function getBackendName(): string {
-        return 'iprotek';
-    }
+    public function getRealUID($uid):string{
+        $query = $this->db->prepare('SELECT uid FROM '.$this->user_table.' WHERE uid_lower = ?');
+        $query->execute([mb_strtolower($uid)]);
+        $row = $query->fetch();
 
-    /**
-     * Optional: search users for listings
-     */
-    public function searchUsers($search, $limit = 10, $offset = 0): array {
-        $results = [];
-        foreach ($this->users as $uid => $info) {
-            if (stripos($uid, $search) !== false || stripos($info['displayName'], $search) !== false) {
-                $results[] = $uid;
-            }
+        if ( $row && $row !== false) {
+            return $row['uid'];
         }
-        return array_slice($results, $offset, $limit);
-    }
 
-    /**
-     * Optional: return display names
-     */
-    public function getDisplayNames($search = '', $limit = null, $offset = null): array {
-        $results = [];
-        foreach ($this->users as $uid => $info) {
-            if ($search === '' || stripos($uid, $search) !== false || stripos($info['displayName'], $search) !== false) {
-                $results[$uid] = $info['displayName'];
-            }
-        }
-        if ($offset !== null && $limit !== null) {
-            $results = array_slice($results, $offset, $limit, true);
-        }
-        return $results;
-    }
-
-    /**
-     * Optional: indicate this backend provides listings
-     */
-    public function hasUserListings(): bool {
-        return true;
-    }
-
-    /**
-     * Optional: indicate supported actions
-     */
-    public function implementsActions($actionName): bool {
-        $uid = static::$UserId;
-        $this->logger->error("Checking for user : $uid ACTION: $actionName");
-        return true;
-    }
-
-    public function deleteUser($uid): bool { return false; }
-
-    public function getUsers($search = '', $limit = null, $offset = null): array { 
-        return [$this->uid]; 
-    }
-
-    public function getDisplayName($uid): string {  
-        return $this->displayName; 
-    }
-
-    public function getUID(): string {
-        if( isset($this->uid) && $this->uid){
-            return $this->uid;
-        }
-        
-
-        return static::$UserId;
-    }
-
-
-    public function getHome(): string {
-        // Return absolute path to user's home directory
-        // Example: Nextcloud data folder + username
-        $dataDir = \OC::$server->getConfig()->getSystemValue('datadirectory', '/var/www/nextcloud/data');
-        return $dataDir . '/' . $this->getUID();
+        // Fallback if not found
+        return $uid;
     }
 
 }

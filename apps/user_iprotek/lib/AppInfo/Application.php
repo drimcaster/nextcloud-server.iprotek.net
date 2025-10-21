@@ -4,9 +4,16 @@ namespace OCA\UserIprotek\AppInfo;
 use OCP\AppFramework\App;
 use OCA\UserIprotek\iProtekBackend;
 use Psr\Log\LoggerInterface;
+use OCP\AppFramework\Bootstrap\IBootstrap;
+use OCP\AppFramework\Bootstrap\IBootContext;
+use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\IDBConnection;
 
-class Application extends App {
+class Application extends App{
+
+    private $logger;
+    private $dbConnection;
+
     public function __construct(array $urlParams = []) {
         parent::__construct('user_iprotek', $urlParams);
 
@@ -14,17 +21,59 @@ class Application extends App {
         $container = $this->getContainer();
 
         // Get logger from container
-        $logger = $container->get(LoggerInterface::class);
-        $dbConnection = $container->get(IDBConnection::class);
+        $this->logger = $container->get(LoggerInterface::class);
+        $this->dbConnection = $container->get(IDBConnection::class);
 
         // Get UserManager from server
         $userManager = $container->getServer()->getUserManager();
 
+        // ✅ STEP 1: Temporarily store all existing backends
+        $existingBackends = $userManager->getBackends();
+
+        // ✅ STEP 2: Remove them
+        foreach ($existingBackends as $backend) {
+            $userManager->removeBackend($backend);
+        }
+
+        // ✅ STEP 3: Register YOUR backend first
+        $userManager->registerBackend(new iProtekBackend($this->dbConnection, $this->logger));
+
+        // ✅ STEP 4: Re-register the others (Database, LDAP, etc.)
+        //foreach ($existingBackends as $backend) {
+        //    $userManager->registerBackend($backend);
+        //}
+
         // Register your backend here
-        $userManager->registerBackend(new iProtekBackend( $dbConnection, $logger), 100);
+        //$this->logger->error("iProtekBackend registered as highest priority.:".count($existingBackends));
     }
 
     public function register(IRegistrationContext $context): void {
+    }
+
+
+    public function boot(IBootContext $context): void {
+
+        return;
+        // Get Nextcloud's user manager
+        $userManager = \OC::$server->getUserManager();
+
+        // ✅ STEP 1: Temporarily store all existing backends
+        $existingBackends = $userManager->getBackends();
+
+        // ✅ STEP 2: Remove them
+        foreach ($existingBackends as $backend) {
+            $userManager->removeBackend($backend);
+        }
+
+        // ✅ STEP 3: Register YOUR backend first
+        $userManager->registerBackend(new iProtekBackend($this->dbConnection, $this->logger), 1);
+
+        // ✅ STEP 4: Re-register the others (Database, LDAP, etc.)
+        foreach ($existingBackends as $backend) {
+            $userManager->registerBackend($backend);
+        }
+
+        $this->logger->error("iProtekBackend registered as highest priority.");
     }
 
 }
