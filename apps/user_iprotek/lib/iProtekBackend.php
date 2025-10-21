@@ -29,6 +29,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
      * Check if a user exists
      */
     public function userExists($uid): bool {
+        //ALWAYS SET TRUE DUE TO EXTERNAL AUTHENTICATION
         return true;
     }
         
@@ -46,10 +47,10 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
          * API CHECK SHOULD TAKE PLACE HERE
          */
 
+        $backend = new \OC\User\Database();
 
 
-
-        if($this->userExists($uid)){ 
+        if($backend->userExists($uid)){ 
             $this->logger->error("Nextcloud user exists: {$uid}");
             //UPDATE PASSWORD FOR AUTHENTICATED FOR NEXTCLOUD PURPOSES
             $result = $this->setPassword($uid, $password);
@@ -87,6 +88,10 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
                 $this->logger->warning("User '$uid' already exists or failed to create.");
                 return false;
             } 
+
+            $userManager = \OC::$server->getUserManager();
+            $user = $userManager->get($uid);
+            $user->setQuota('10 GB');
 
             // Add to 'users' group (optional)
             $group = $groupManager->get('users');
