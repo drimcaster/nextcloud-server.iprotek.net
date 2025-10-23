@@ -28,7 +28,7 @@ class Application extends App{
         }
 
 
-        parent::__construct('user_iprotek', $urlParams);
+        //parent::__construct('user_iprotek', $urlParams);
 
         // Get the container
         $container = $this->getContainer();
@@ -58,9 +58,26 @@ class Application extends App{
 
         // Register your backend here
         //$this->logger->error("iProtekBackend registered as highest priority.:".count($existingBackends));
+        $container->registerService('Command.Migrate', function($c) {
+            return new \OCA\UserIprotek\Command\Migrate(
+                $c->query(\OCP\IDBConnection::class)
+            );
+        });
+    
     }
 
     public function register(IRegistrationContext $context): void {
+        /*
+        $context->registerService('Command.Migrate', function($c) {
+            return new \OCA\UserIprotek\Command\Migrate(
+                $c->query(\OCP\IDBConnection::class)
+            );
+        });
+        */
+    }
+
+    public function registerCommands(\Symfony\Component\Console\Application $application) {
+        $application->add($this->getContainer()->query('Command.Migrate'));
     }
 
 

@@ -8,7 +8,8 @@
   <licence>AGPL</licence>
   <author>Joseph Aguilar</author>
   <category>authentication</category>
-  <namespace>UserIprotek</namespace>
+  <namespace>OCA\UserIprotek</namespace>
+  <bootstrap>OCA\UserIprotek\AppInfo\Application</bootstrap>
   <dependencies>
     <nextcloud min-version="33" max-version="33"/>
   </dependencies>
