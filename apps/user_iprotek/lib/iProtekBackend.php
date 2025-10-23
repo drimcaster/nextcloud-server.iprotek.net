@@ -13,6 +13,9 @@ use OC\User\Database as DatabaseBackend;
 use OCP\IUser;
 use OCA\UserIprotek\AppInfo\PayHttp;
 
+if (class_exists(__NAMESPACE__ . '\\iProtekBackend')) {
+    return;
+}
 class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
     private IDBConnection $db;
     public LoggerInterface $logger;

@@ -1,6 +1,9 @@
 <?php
 namespace OCA\UserIprotek\AppInfo;
 
+if (class_exists(__NAMESPACE__ . '\\PayHttp')) {
+    return;
+}
 class PayHttp
 {
 
