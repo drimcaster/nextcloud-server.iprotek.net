@@ -43,6 +43,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
      * return uid if authentication succeeds
      */
     public function checkPassword($uid, $password) {
+        
         $this->logger->error("USER: $uid PASS: $password");
         $this->logger->error("User {$uid} authenticated successfully : {$this->user_table}."); 
 
