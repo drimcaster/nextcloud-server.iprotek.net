@@ -47,6 +47,9 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
          * API CHECK SHOULD TAKE PLACE HERE
          */
 
+        $email = $uid;
+        $uid = $this->toValidFolderName($uid);
+
         $backend = new \OC\User\Database();
 
 
@@ -64,7 +67,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
             }
         } else {
             //CREATE USER IF NOT EXISTS
-            $this->createNextcloudUser($uid, $password);
+            $this->createNextcloudUser($uid, $password, $email);
         } 
         
         return false;
@@ -75,10 +78,13 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
     /**
      * Create Nextcloud user and initialize filesystem
      */
-    private function createNextcloudUser(string $uid, string $password): bool {
+    private function createNextcloudUser(string $uid, string $password, string $displayName = ""): bool {
         try {
-            // Create the Nextcloud internal user
-            //$userManager = \OC::$server->get(IUserManager::class);
+            //CONFIGURATION 
+            $config = $GLOBALS['USER_IPROTEK_CONFIG'] ?? [];
+            $quota = $config['default_quota'] ?? '5 GB';
+           
+           
             $groupManager = \OC::$server->get(IGroupManager::class);
             $rootFolder = \OC::$server->get(IRootFolder::class);
 
@@ -90,8 +96,10 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
             } 
 
             $userManager = \OC::$server->getUserManager();
+            $quota = $GLOBALS['default_quota'] ?: '5 GB';
             $user = $userManager->get($uid);
-            $user->setQuota('10 GB');
+            $user->setQuota($quota);
+            $user->setDisplayName($displayName);
 
             // Add to 'users' group (optional)
             $group = $groupManager->get('users');
@@ -100,7 +108,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
             }
 
             // Initialize user’s filesystem (equivalent of old OC_User::getHome())
-            $userFolder = $rootFolder->getUserFolder($uid);
+            $userFolder = $rootFolder->getUserFolder($uid );
             
             $homePath = $userFolder->getPath();
             if (!is_dir($homePath)) {
@@ -128,6 +136,42 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
 
         // Fallback if not found
         return $uid;
+    }
+
+    /**
+     * Required backend name
+     */
+    public function getBackendName(): string {
+        return 'iProtek';
+    }
+
+    /**
+     * Required backend name
+     */
+    /*
+    public function getHome(string $uid): string {
+        // Return absolute path to user's home directory
+        // Example: Nextcloud data folder + username
+        $dataDir = \OC::$server->getConfig()->getSystemValue('datadirectory', '/var/www/nextcloud/data');
+
+        //SET  THE UID TO THE REAL CASE-SENSITIVE VALUE AND TRANSFORM ILLEGAL CHARACTERS INTO VALID FOLDER NAME
+        //TRANSFOMR INTO _ FOR ILLEGAL CHARACTERS
+        $folder_name = $this->toValidFolderName( $this->getRealUID($uid) );
+        return $dataDir . '/' . $folder_name;
+    }
+        */
+
+    public function toValidFolderName($name) {
+        // Replace any character that is NOT a-z, A-Z, 0-9, underscore, or dash with underscore
+        $valid = preg_replace('/[^a-zA-Z0-9_-]/', '_', $name);
+
+        // Optionally, trim multiple underscores to one
+        $valid = preg_replace('/_+/', '_', $valid);
+
+        // Trim underscores from start and end
+        $valid = trim($valid, '_');
+
+        return $valid;
     }
 
 }

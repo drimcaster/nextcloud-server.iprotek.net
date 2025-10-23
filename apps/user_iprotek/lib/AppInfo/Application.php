@@ -21,6 +21,12 @@ class Application extends App{
             require_once $autoload;
         }
 
+        // Load your custom config file
+        $configPath = __DIR__ . '/../config/config.php';
+        if (file_exists($configPath)) {
+            $GLOBALS['USER_IPROTEK_CONFIG'] = include $configPath;
+        }
+
 
         parent::__construct('user_iprotek', $urlParams);
 
