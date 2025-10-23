@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace OCA\UserIprotek\AppInfo;
 
 use OCP\AppFramework\App;
@@ -9,12 +10,19 @@ use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\IDBConnection;
 
+if (class_exists(__NAMESPACE__ . '\\Application')) {
+    return;
+}
+
 class Application extends App{
 
     private $logger;
     private $dbConnection;
+    public const APP_ID = 'user_iprotek';
 
     public function __construct(array $urlParams = []) {
+
+        parent::__construct(self::APP_ID, $urlParams);
 
         $autoload = __DIR__ . '/../../vendor/autoload.php';
         if (file_exists($autoload)) {
@@ -28,7 +36,6 @@ class Application extends App{
         }
 
 
-        //parent::__construct('user_iprotek', $urlParams);
 
         // Get the container
         $container = $this->getContainer();
@@ -58,13 +65,18 @@ class Application extends App{
 
         // Register your backend here
         //$this->logger->error("iProtekBackend registered as highest priority.:".count($existingBackends));
+        /*
         $container->registerService('Command.Migrate', function($c) {
             return new \OCA\UserIprotek\Command\Migrate(
                 $c->query(\OCP\IDBConnection::class)
             );
         });
-    
+        
+        //$manager = \OC::$server->get(\OCP\Migration\IRegistrationContext::class);
+        //$manager->registerMigration('user_iprotek', 'Migration\Version0001Date20241023');
+        */
     }
+        
 
     public function register(IRegistrationContext $context): void {
         /*
@@ -72,18 +84,16 @@ class Application extends App{
             return new \OCA\UserIprotek\Command\Migrate(
                 $c->query(\OCP\IDBConnection::class)
             );
-        });
-        */
+        });*/ 
     }
 
     public function registerCommands(\Symfony\Component\Console\Application $application) {
-        $application->add($this->getContainer()->query('Command.Migrate'));
+        //$application->add($this->getContainer()->query('Command.Migrate'));
     }
 
 
     public function boot(IBootContext $context): void {
 
-        return;
     }
 
 }

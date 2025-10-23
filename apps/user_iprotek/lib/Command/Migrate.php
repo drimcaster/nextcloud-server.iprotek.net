@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace OCA\UserIprotek\Command;
 
 use OC\Core\Command\Base;
-use OCA\UserIprotek\Migration\Version0001Date20251023;
 use OCP\DB\IDBConnection;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -29,7 +28,7 @@ class Migrate extends Base {
         $output->writeln('<info>Running user_iprotek migrations...</info>');
 
         $schema = $this->connection->createSchema();
-        $migration = new Version0001Date20251023();
+        $migration = new OCA\OCA\UserIprotek\Migration\Version0001Date20251023();
         $migration->changeSchema(new class($output) implements \OCP\Migration\IOutput {
             private $output;
             public function __construct($output) { $this->output = $output; }

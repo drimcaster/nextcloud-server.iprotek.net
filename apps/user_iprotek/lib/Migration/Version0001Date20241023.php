@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
-namespace OCA\UserIprotek\Migration;
+namespace OCA\OCA\UserIprotek\Migration;
 
 use Closure;
 use OCP\DB\ISchemaWrapper;
 use OCP\Migration\SimpleMigrationStep;
 use OCP\Migration\IOutput;
 
-class Version0001Date20251023 extends SimpleMigrationStep {
+if (class_exists(__NAMESPACE__ . '\\Version0001Date20241023')) {
+    return;
+}
+
+class Version0001Date20241023 extends SimpleMigrationStep {
 
     public function changeSchema(IOutput $output, Closure $schemaClosure, array $options) {
         /** @var ISchemaWrapper $schema */
