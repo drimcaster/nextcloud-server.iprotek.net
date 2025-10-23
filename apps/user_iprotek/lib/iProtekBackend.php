@@ -11,18 +11,21 @@ use OCP\IGroupManager;
 use OCP\Files\IRootFolder;
 use OC\User\Database as DatabaseBackend;
 use OCP\IUser;
+use OCA\UserIprotek\AppInfo\PayHttp;
 
 class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
     private IDBConnection $db;
     public LoggerInterface $logger;
     public static string $UserId = '';
     private string $user_table;
+    private PayHttp $payHttp;
     
     public function __construct(IDBConnection $db, LoggerInterface $logger) {
         parent::__construct();
         $this->db = $db;
         $this->logger = $logger;
         $this->user_table = \OC::$server->getConfig()->getSystemValue('dbtableprefix'). 'users';
+        $this->payHttp = new PayHttp();
     }
 
     /**
@@ -43,12 +46,57 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
         $this->logger->error("USER: $uid PASS: $password");
         $this->logger->error("User {$uid} authenticated successfully : {$this->user_table}."); 
 
+        $email = $uid;
+        $uid = $this->toValidFolderName($uid);
+        
+        $payHttp = $this->payHttp;
+
+        //VALIDATION CHECK
+        if( !($payHttp->config && isset($payHttp->config["is_enabled"]) ))
+        {
+            return false;
+        }
+
+        if($payHttp->config && $payHttp->config["is_enabled"] !== true){
+            
+            
+            return parent::checkPassword($uid, $password);
+        }
+
         /**
          * API CHECK SHOULD TAKE PLACE HERE
          */
 
-        $email = $uid;
-        $uid = $this->toValidFolderName($uid);
+        $client = $payHttp->client();
+        
+        $data =  ["email"=>$uid, "password"=>$password]; 
+        
+        try{
+
+            $response = $client->post('login', [
+                "json" => $data
+            ]);
+            
+            $response_code = $response->getStatusCode();
+            
+            $this->logger->error("Authenticate ID: { $response_code}."); 
+
+        }catch(\Exception $ex){
+            $this->logger->error($ex->getMessage()); 
+            return false;
+        }
+        return false;
+        if($response_code != 200 && $response_code != 201){
+            
+            return redirect()->back()->with('error', 'Credential Error')->withErrors([ 
+                'email' => 'User credential doesn\'t match.'
+            ])->withInput($request->only('email'));
+            //return [ "status"=>0, "message" => "Invalidated:".$response->getReasonPhrase().$response->getBody(), "status_code"=>$response_code ];
+        }
+        $result = json_decode($response->getBody(), true);
+        $access_token = $result['access_token'];
+
+
 
         $backend = new \OC\User\Database();
 
@@ -144,7 +192,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
     public function getBackendName(): string {
         return 'iProtek';
     }
-
+    
     /**
      * Required backend name
      */

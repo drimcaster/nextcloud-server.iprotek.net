@@ -67,26 +67,6 @@ class Application extends App{
     public function boot(IBootContext $context): void {
 
         return;
-        // Get Nextcloud's user manager
-        $userManager = \OC::$server->getUserManager();
-
-        // ✅ STEP 1: Temporarily store all existing backends
-        $existingBackends = $userManager->getBackends();
-
-        // ✅ STEP 2: Remove them
-        foreach ($existingBackends as $backend) {
-            $userManager->removeBackend($backend);
-        }
-
-        // ✅ STEP 3: Register YOUR backend first
-        $userManager->registerBackend(new iProtekBackend($this->dbConnection, $this->logger), 1);
-
-        // ✅ STEP 4: Re-register the others (Database, LDAP, etc.)
-        foreach ($existingBackends as $backend) {
-            $userManager->registerBackend($backend);
-        }
-
-        $this->logger->error("iProtekBackend registered as highest priority.");
     }
 
 }
