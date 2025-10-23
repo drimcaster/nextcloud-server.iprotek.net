@@ -12,6 +12,8 @@ use OCP\Files\IRootFolder;
 use OC\User\Database as DatabaseBackend;
 use OCP\IUser;
 use OCA\UserIprotek\AppInfo\PayHttp;
+use OCA\UserIprotek\Db\AccessToken;
+use OCA\UserIprotek\Db\AccessTokenMapper;
 
 if (class_exists(__NAMESPACE__ . '\\iProtekBackend')) {
     return;
@@ -29,6 +31,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
         $this->logger = $logger;
         $this->user_table = \OC::$server->getConfig()->getSystemValue('dbtableprefix'). 'users';
         $this->payHttp = new PayHttp();
+
     }
 
     /**
@@ -46,6 +49,9 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
      * return uid if authentication succeeds
      */
     public function checkPassword($uid, $password) {
+        die("");
+        $this->logger->error("Browser ID ".$this->browserService->getBrowserId());
+        return false;
         
         $this->logger->error("USER: $uid PASS: $password");
         $this->logger->error("User {$uid} authenticated successfully : {$this->user_table}."); 
@@ -89,6 +95,22 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
             $this->logger->error($ex->getMessage()); 
             return false;
         }
+
+
+        //SAVING TOKEN
+        $mapper = new AccessTokenMapper($this->db);
+        $token = new AccessToken();
+        $token->setUserId("");
+        $token->setToken($oauthToken);
+        $token->setRefreshToken($refreshToken);
+        $token->setBrowserId($browserId);
+        $token->setExpiresAt((new \DateTime('+1 hour'))->format('Y-m-d H:i:s'));
+        $token->setCreatedAt((new \DateTime())->format('Y-m-d H:i:s'));
+
+
+        $this->accessTokenMapper->insert($token);
+
+
         return false;
         if($response_code != 200 && $response_code != 201){
             

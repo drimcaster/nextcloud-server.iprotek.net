@@ -9,7 +9,7 @@
   <author>Joseph Aguilar</author>
   <category>authentication</category>
   <namespace>OCA\UserIprotek</namespace>
-  <bootstrap>OCA\UserIprotek\AppInfo\Application</bootstrap>
+  <bootstrap>OCA\UserIprotek\AppInfo</bootstrap>
   <dependencies>
     <nextcloud min-version="33" max-version="33"/>
   </dependencies>

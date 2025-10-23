@@ -9,6 +9,8 @@ use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\IDBConnection;
+use OCP\AppFramework\IAppContainer;
+use OCA\UserIprotek\Service\BrowserService;
 
 if (class_exists(__NAMESPACE__ . '\\Application')) {
     return;
@@ -21,6 +23,8 @@ class Application extends App{
     public const APP_ID = 'user_iprotek';
 
     public function __construct(array $urlParams = []) {
+
+        die();
 
         parent::__construct(self::APP_ID, $urlParams);
 
@@ -62,19 +66,14 @@ class Application extends App{
         //foreach ($existingBackends as $backend) {
         //    $userManager->registerBackend($backend);
         //}
-
-        // Register your backend here
-        //$this->logger->error("iProtekBackend registered as highest priority.:".count($existingBackends));
-        /*
-        $container->registerService('Command.Migrate', function($c) {
-            return new \OCA\UserIprotek\Command\Migrate(
-                $c->query(\OCP\IDBConnection::class)
+        $container->registerService(BrowserService::class, function(IAppContainer $c) {
+            return new BrowserService(
+                $c->getServer()->getRequest(),
+                $c->getServer()->getSession(),
+                $c->getServer()->getSecureRandom()
             );
         });
-        
-        //$manager = \OC::$server->get(\OCP\Migration\IRegistrationContext::class);
-        //$manager->registerMigration('user_iprotek', 'Migration\Version0001Date20241023');
-        */
+ 
     }
         
 
