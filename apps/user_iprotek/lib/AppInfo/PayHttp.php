@@ -8,6 +8,7 @@ class PayHttp
 {
 
     public $config = [];
+    public $headers = [];
 
     public function __construct() {
 
@@ -32,12 +33,14 @@ class PayHttp
             if($is_auth == false){
                 $headers = [
                     "Accept"=>"application/json",
+                    "Content-Type"=>"application/json",
                     "Authorization"=>"Bearer ".$client_id.":".$client_secret
                 ];
             }
             else{
                 $headers = [
                     "Accept"=>"application/json",
+                    "Content-Type"=>"application/json",
                     "Authorization"=>"Bearer ".$access_token
                 ];
             }
@@ -52,6 +55,8 @@ class PayHttp
         $headers["SYSTEM-URL"] = $config["system_url"];
         $headers["PAY-USER-ACCOUNT-ID"] = 0;
         $headers["PAY-PROXY-ID"] = 0;
+
+        $this->headers = $headers;
         
         $client = new \GuzzleHttp\Client([
             'base_uri' => $pay_url,

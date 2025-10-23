@@ -24,8 +24,6 @@ class Application extends App{
 
     public function __construct(array $urlParams = []) {
 
-        die();
-
         parent::__construct(self::APP_ID, $urlParams);
 
         $autoload = __DIR__ . '/../../vendor/autoload.php';
@@ -43,6 +41,15 @@ class Application extends App{
 
         // Get the container
         $container = $this->getContainer();
+        
+        $container->registerService(BrowserService::class, function($c) {
+            return new BrowserService(
+                $c->query(\OCP\IRequest::class),
+                $c->query(\OCP\ISession::class),
+                $c->query(\OCP\Security\ISecureRandom::class)
+            );
+        });
+        
 
         // Get logger from container
         $this->logger = $container->get(LoggerInterface::class);
@@ -66,13 +73,6 @@ class Application extends App{
         //foreach ($existingBackends as $backend) {
         //    $userManager->registerBackend($backend);
         //}
-        $container->registerService(BrowserService::class, function(IAppContainer $c) {
-            return new BrowserService(
-                $c->getServer()->getRequest(),
-                $c->getServer()->getSession(),
-                $c->getServer()->getSecureRandom()
-            );
-        });
  
     }
         
@@ -87,7 +87,7 @@ class Application extends App{
     }
 
     public function registerCommands(\Symfony\Component\Console\Application $application) {
-        //$application->add($this->getContainer()->query('Command.Migrate'));
+        $application->add($this->getContainer()->query('Command.Migrate'));
     }
 
 
