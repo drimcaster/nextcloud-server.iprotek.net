@@ -15,6 +15,13 @@ class Application extends App{
     private $dbConnection;
 
     public function __construct(array $urlParams = []) {
+
+        $autoload = __DIR__ . '/../../vendor/autoload.php';
+        if (file_exists($autoload)) {
+            require_once $autoload;
+        }
+
+
         parent::__construct('user_iprotek', $urlParams);
 
         // Get the container
