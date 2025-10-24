@@ -186,3 +186,4 @@ cypress/videos
 composer.lock
 dist/*.license
 3rdparty
+lib/composer/composer/autoload*.php
