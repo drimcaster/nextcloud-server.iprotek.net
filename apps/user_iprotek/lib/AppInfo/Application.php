@@ -11,10 +11,30 @@ use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\IDBConnection;
 use OCP\AppFramework\IAppContainer;
 use OCA\UserIprotek\Service\BrowserService;
+use OCA\UserIprotek\Middleware\LostRedirectMiddleware;
+use OCP\EventDispatcher\IEventDispatcher;
+use OCP\AppFramework\Http\Events\BeforeControllerEvent;
+use OCP\AppFramework\Http\RedirectResponse;
 
 if (class_exists(__NAMESPACE__ . '\\Application')) {
     return;
 }
+
+$dispatcher = \OC::$server->query(IEventDispatcher::class);
+$dispatcher->addListener(BeforeControllerEvent::class, function (BeforeControllerEvent $event) {
+    $request = \OC::$server->getRequest();
+    $path = $request->getPathInfo();
+
+    // Intercept the core lostpassword route
+        die("GG");
+    if ($path === '/lostpassword/email') {
+        $urlGen = \OC::$server->getURLGenerator();
+        $customUrl = $urlGen->linkToRouteAbsolute('user_iprotek.lost.email');
+
+        $event->setResponse(new RedirectResponse($customUrl));
+    }
+});
+
 
 class Application extends App implements IBootstrap {
 
@@ -30,14 +50,6 @@ class Application extends App implements IBootstrap {
         if (file_exists($autoload)) {
             require_once $autoload;
         }
-
-        // Load your custom config file
-        $configPath = __DIR__ . '/../config/config.php';
-        if (file_exists($configPath)) {
-            $GLOBALS['USER_IPROTEK_CONFIG'] = include $configPath;
-        }
-
-
 
         // Get the container
         $container = $this->getContainer();
@@ -78,43 +90,10 @@ class Application extends App implements IBootstrap {
         
 
     public function register(IRegistrationContext $context): void {
-        /*
-        $context->registerService('Command.Migrate', function($c) {
-            return new \OCA\UserIprotek\Command\Migrate(
-                $c->query(\OCP\IDBConnection::class)
-            );
-        });*/ 
-    }
-
-    public function registerCommands(\Symfony\Component\Console\Application $application) {
-       //$application->add($this->getContainer()->query('Command.Migrate'));
     }
 
 
-    public function boot(IBootContext $context): void {
-        $this->logger->error("DATA INFO");
-        $context->injectFn(function () {
-            /** @var \OCP\Route\IRouter $router */
-            $router = \OC::$server->get(\OCP\Route\IRouter::class);
-            $collection = $router->getCollection();
-
-            // Remove default route if it exists
-            if ($collection->get('core.lost.email')) {
-                $collection->remove('core.lost.email');
-            }
-
-            // Add your custom route
-            $route = new Route(
-                '/lostpassword/email',
-                [
-                    '_controller' => 'OCA\\UserIprotek\\Controller\\LostController::email',
-                    '_route' => 'core.lost.email',
-                ],
-                [], [], '', [], ['POST']
-            );
-
-            $collection->add('core.lost.email', $route);
-        });
+    public function boot(IBootContext $context): void { 
     }
 
 }
