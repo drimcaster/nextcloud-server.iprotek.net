@@ -16,7 +16,7 @@ if (class_exists(__NAMESPACE__ . '\\Application')) {
     return;
 }
 
-class Application extends App{
+class Application extends App implements IBootstrap {
 
     private $logger;
     private $dbConnection;
@@ -73,7 +73,7 @@ class Application extends App{
         //foreach ($existingBackends as $backend) {
         //    $userManager->registerBackend($backend);
         //}
- 
+        
     }
         
 
@@ -87,12 +87,34 @@ class Application extends App{
     }
 
     public function registerCommands(\Symfony\Component\Console\Application $application) {
-        $application->add($this->getContainer()->query('Command.Migrate'));
+       //$application->add($this->getContainer()->query('Command.Migrate'));
     }
 
 
     public function boot(IBootContext $context): void {
+        $this->logger->error("DATA INFO");
+        $context->injectFn(function () {
+            /** @var \OCP\Route\IRouter $router */
+            $router = \OC::$server->get(\OCP\Route\IRouter::class);
+            $collection = $router->getCollection();
 
+            // Remove default route if it exists
+            if ($collection->get('core.lost.email')) {
+                $collection->remove('core.lost.email');
+            }
+
+            // Add your custom route
+            $route = new Route(
+                '/lostpassword/email',
+                [
+                    '_controller' => 'OCA\\UserIprotek\\Controller\\LostController::email',
+                    '_route' => 'core.lost.email',
+                ],
+                [], [], '', [], ['POST']
+            );
+
+            $collection->add('core.lost.email', $route);
+        });
     }
 
 }
