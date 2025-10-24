@@ -32,15 +32,9 @@ class Version0001Date20241023 extends SimpleMigrationStep {
                 'notnull' => true,
             ]);
 
-            $table->addColumn('token', 'string', [
-                'length' => 255,
-                'notnull' => true,
-            ]);
+            $table->addColumn('token', 'longtext',[]);
 
-            $table->addColumn('refresh_token', 'string', [
-                'length' => 255,
-                'notnull' => false,
-            ]);
+            $table->addColumn('refresh_token', 'longtext',[]);
 
             $table->addColumn('browser_id', 'string', [
                 'length' => 128,

@@ -14,6 +14,8 @@ use OCP\IUser;
 use OCA\UserIprotek\AppInfo\PayHttp;
 use OCA\UserIprotek\Db\AccessToken;
 use OCA\UserIprotek\Db\AccessTokenMapper;
+use OCA\UserIprotek\Service\BrowserService;
+use OCP\Http\Client\IClientService;
 
 if (class_exists(__NAMESPACE__ . '\\iProtekBackend')) {
     return;
@@ -24,6 +26,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
     public static string $UserId = '';
     private string $user_table;
     private PayHttp $payHttp;
+    private static bool $loginValid = true;
     
     public function __construct(IDBConnection $db, LoggerInterface $logger) {
         parent::__construct();
@@ -39,6 +42,9 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
      */
     public function userExists($uid): bool {
         //ALWAYS SET TRUE DUE TO EXTERNAL AUTHENTICATION
+        if(!static::$loginValid){
+            return false;
+        }
         return true;
     }
         
@@ -49,14 +55,12 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
      * return uid if authentication succeeds
      */
     public function checkPassword($uid, $password) {
-        die("");
-        $this->logger->error("Browser ID ".$this->browserService->getBrowserId());
-        return false;
+        if(static::$loginValid === false){
+            return false;
+        }
         
-        $this->logger->error("USER: $uid PASS: $password");
-        $this->logger->error("User {$uid} authenticated successfully : {$this->user_table}."); 
-
-        $email = $uid;
+        $email = trim($uid);
+        $password = trim($password);
         $uid = $this->toValidFolderName($uid);
         
         $payHttp = $this->payHttp;
@@ -67,9 +71,8 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
             return false;
         }
 
-        if($payHttp->config && $payHttp->config["is_enabled"] !== true){
-            
-            
+        //ENFORCING ADMIN USERNAME FOR SUPERADMIN AUTH
+        if($payHttp->config && $payHttp->config["is_enabled"] !== true || $uid === 'admin'){            
             return parent::checkPassword($uid, $password);
         }
 
@@ -78,73 +81,64 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
          */
 
         $client = $payHttp->client();
-        
-        $data =  ["email"=>$uid, "password"=>$password]; 
+        $data =  ["email"=>$email, "password"=>$password]; 
+        $this->logger->error("Client Info email: {$email}. password: {$password} - ". json_encode($data) ); 
         
         try{
 
             $response = $client->post('login', [
-                "json" => $data
+                "json" =>  $data 
             ]);
             
             $response_code = $response->getStatusCode();
             
-            $this->logger->error("Authenticate ID: { $response_code}."); 
+            if($response_code != 200 && $response_code != 201){
+                $this->logger->error("Credential does not matched: {$email}. ({$response_code})".json_encode($response->getBody()));
+                static::$loginValid = false;
+                return false;
+            }
 
         }catch(\Exception $ex){
             $this->logger->error($ex->getMessage()); 
             return false;
         }
+        
+        $this->logger->error(" User login success: {$email}.");
 
-
-        //SAVING TOKEN
+        //BROWSER ID
+        $browserService = \OC::$server->query(\OCA\UserIprotek\Service\BrowserService::class);
+        $browserId = $browserService->getBrowserId();
+        
+        //TOKEN RESPONSE
+        $result = json_decode($response->getBody(), true);
+        $access_token = $result['access_token'];
+        $refreshToken = isset($result['refresh_token']) ? $result['refresh_token'] : '';
+        
+        //SAVING TOKEN FROM API
         $mapper = new AccessTokenMapper($this->db);
         $token = new AccessToken();
-        $token->setUserId("");
-        $token->setToken($oauthToken);
+        $token->setUserId($uid);
+        $token->setToken($access_token);
         $token->setRefreshToken($refreshToken);
         $token->setBrowserId($browserId);
         $token->setExpiresAt((new \DateTime('+1 hour'))->format('Y-m-d H:i:s'));
         $token->setCreatedAt((new \DateTime())->format('Y-m-d H:i:s'));
-
-
-        $this->accessTokenMapper->insert($token);
-
-
-        return false;
-        if($response_code != 200 && $response_code != 201){
-            
-            return redirect()->back()->with('error', 'Credential Error')->withErrors([ 
-                'email' => 'User credential doesn\'t match.'
-            ])->withInput($request->only('email'));
-            //return [ "status"=>0, "message" => "Invalidated:".$response->getReasonPhrase().$response->getBody(), "status_code"=>$response_code ];
-        }
-        $result = json_decode($response->getBody(), true);
-        $access_token = $result['access_token'];
-
-
-
+        $mapper->insert($token);
+        
         $backend = new \OC\User\Database();
 
 
         if($backend->userExists($uid)){ 
             $this->logger->error("Nextcloud user exists: {$uid}");
             //UPDATE PASSWORD FOR AUTHENTICATED FOR NEXTCLOUD PURPOSES
-            $result = $this->setPassword($uid, $password);
-            if($result){
-                $this->logger->error("Password set successfully: {$uid}");
-                return $uid;
-            }
-            else{
-                $this->logger->error("Failed to set password: {$uid}");
-                return false;
-            }
+            $result = $this->setPassword($uid, $password); 
         } else {
             //CREATE USER IF NOT EXISTS
             $this->createNextcloudUser($uid, $password, $email);
         } 
         
-        return false;
+        static::$loginValid = false;
+        return $uid;
     
     }
     
@@ -154,25 +148,23 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
      */
     private function createNextcloudUser(string $uid, string $password, string $displayName = ""): bool {
         try {
-            //CONFIGURATION 
-            $config = $GLOBALS['USER_IPROTEK_CONFIG'] ?? [];
-            $quota = $config['default_quota'] ?? '5 GB';
+            //CONFIGURATION
+            $quota = $this->payHttp->config['default_quota'] ?: '5 GB';
            
            
             $groupManager = \OC::$server->get(IGroupManager::class);
             $rootFolder = \OC::$server->get(IRootFolder::class);
 
             $backend = new \OC\User\Database(); // core DB backend
-            $user = $backend->createUser($uid, $password);
-            if (!$user) {
+            $is_created = $backend->createUser($uid, $password);
+            if (!$is_created) {
                 $this->logger->warning("User '$uid' already exists or failed to create.");
                 return false;
             } 
 
             $userManager = \OC::$server->getUserManager();
-            $quota = $GLOBALS['default_quota'] ?: '5 GB';
             $user = $userManager->get($uid);
-            $user->setQuota($quota);
+            $user->setQuota('5 GB');
             $user->setDisplayName($displayName);
 
             // Add to 'users' group (optional)
@@ -182,6 +174,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
             }
 
             // Initialize user’s filesystem (equivalent of old OC_User::getHome())
+            /*
             $userFolder = $rootFolder->getUserFolder($uid );
             
             $homePath = $userFolder->getPath();
@@ -191,6 +184,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
 
             // Trigger post-creation hooks (like dashboard, files, etc.)
             $this->logger->info("Created Nextcloud user '$uid' with home folder '$homePath'");
+            */
 
             return true;
         } catch (\Throwable $e) {
