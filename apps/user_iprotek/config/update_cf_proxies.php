@@ -1,6 +1,8 @@
 <?php
+
+$nextCloudDir = __DIR__ . '/../../../';
 // Path to your Nextcloud config.php
-$configPath = __DIR__ . '/config.php';
+$configPath = $nextCloudDir. 'config/config.php';
 
 // Optional: Lock updates (set in your environment, e.g., export LOCK_CF_UPDATE=true)
 //if (getenv('LOCK_CF_UPDATE')) {
@@ -27,13 +29,34 @@ $cf_ips = array_merge($cf_ipv4, $cf_ipv6);
 // Load existing config safely
 $config = include $configPath;
 
+// If config.php uses `$CONFIG = array(...)`, normalize to array
+if (isset($CONFIG) && is_array($CONFIG)) {
+    $config = $CONFIG;
+}
+
+if(!isset($config)){
+    die("Error: Config not set.\n");
+}
+
 // Compare existing vs new Cloudflare IPs
 $currentProxies = $config['trusted_proxies'] ?? [];
 
-sort($currentProxies);
-sort($cf_ips);
+// --- Add your custom proxy IPs here ---
+$customProxies = [
+    '127.0.0.1',            // Example: local OLS or Nginx reverse proxy
+    '::1',
+    //'192.168.1.10',         // Example: internal proxy or LAN proxy
+    // Add more if needed
+];
 
-if ($currentProxies === $cf_ips) {
+// Merge custom + Cloudflare proxies
+$newProxies = array_unique(array_merge($customProxies, $cf_ips));
+
+// Sort for consistency
+sort($currentProxies);
+sort($newProxies);
+
+if ($currentProxies === $newProxies) {
     echo "No changes detected in Cloudflare IPs. Skipping update.\n";
     exit;
 }
@@ -42,13 +65,13 @@ if ($currentProxies === $cf_ips) {
 copy($configPath, $configPath . '.bak_' . date('Ymd_His'));
 
 // Update trusted_proxies only if changed
-$config['trusted_proxies'] = $cf_ips;
+$config['trusted_proxies'] = $newProxies;
 
 // Ensure forwarded_for_headers exist
 $config['forwarded_for_headers'] = ['HTTP_X_FORWARDED_FOR', 'HTTP_CF_CONNECTING_IP'];
 
 // Build the return array syntax
-$content = "<?php\n\nreturn " . var_export($config, true) . ";\n";
+$content = "<?php\n".'$CONFIG = ' . var_export($config, true) . ";\n";
 
 // Write back to config.php
 if (file_put_contents($configPath, $content) === false) {

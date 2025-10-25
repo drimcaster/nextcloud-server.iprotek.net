@@ -6,6 +6,7 @@
 /data
 /config/config.php
 /config/*.config.php
+/config/*.bak_*
 /config/mimetype*.json
 /config/mount.php
 /apps/inc.php
