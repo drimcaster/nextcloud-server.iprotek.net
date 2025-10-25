@@ -175,7 +175,6 @@ composer.phar
 /vendor-bin/**/vendor
 
 ./.htaccess
-core/js/mimetypelist.js
 
 # Tests - cypress
 cypress/downloads
