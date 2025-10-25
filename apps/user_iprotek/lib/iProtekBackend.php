@@ -81,9 +81,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
          */
 
         $client = $payHttp->client();
-        $data =  ["email"=>$email, "password"=>$password]; 
-        $this->logger->error("Client Info email: {$email}. password: {$password} - ". json_encode($data) ); 
-        
+        $data =  ["email"=>$email, "password"=>$password];         
         try{
 
             $response = $client->post('login', [
@@ -93,7 +91,7 @@ class iProtekBackend extends DatabaseBackend  { //IUserBackend, UserInterface {
             $response_code = $response->getStatusCode();
             
             if($response_code != 200 && $response_code != 201){
-                $this->logger->error("Credential does not matched: {$email}. ({$response_code})".json_encode($response->getBody()));
+                $this->logger->error("Credential does not matched: {$email}. ({$response_code})");
                 static::$loginValid = false;
                 return false;
             }
